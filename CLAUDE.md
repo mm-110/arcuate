@@ -3,7 +3,7 @@
 Rust utility that acts as a **semantic bridge** between source code and its conceptual representation.
 Scans a codebase and generates a mirror of Markdown files optimised for LLM consumption: signatures, docstrings, and links to the originals — without exposing full source unless needed.
 Produces an `INDEX.md` with a full project tree and dual links (`.md` docs + source file) for every node.
-Stack: Rust 2021 · `rustpython-parser` (AST) · `walkdir` (filesystem) · `anyhow` (errors).
+Stack: Rust 2024 · `rustpython-parser` (AST) · `walkdir` (filesystem) · `anyhow` (errors).
 
 ---
 
@@ -12,20 +12,21 @@ Stack: Rust 2021 · `rustpython-parser` (AST) · `walkdir` (filesystem) · `anyh
 ```
 ┌─────────────────────────────────────────────┐
 │  Application Layer  (Orchestrator)          │
-│  scan → dispatch sensor → extract → write   │
+│  FileScanner — walks filesystem, dispatches │
+│  analyzers, builds ProjectLayout            │
 └────────────────┬────────────────────────────┘
                  │ uses
 ┌────────────────▼────────────────────────────┐
-│  Infrastructure Layer  (Sensors)            │
-│  LanguageSensor trait                       │
-│    └── PythonSensor  (rustpython-parser)    │
-│  FileScanner  (walkdir)                     │
+│  Infrastructure Layer  (Adapters)           │
+│    └── PythonParser  (rustpython-parser)    │
+│        implements SourceCodeAnalyzer        │
 └────────────────┬────────────────────────────┘
                  │ produces
 ┌────────────────▼────────────────────────────┐
 │  Core Domain   (Entities + Ports)           │
 │  entities/  DocumentedConstruct,            │
 │             ParsedSourceFile, ProjectLayout │
+│             SourceFileAnalysis              │
 │  ports/     SourceCodeAnalyzer, ParserError │
 └─────────────────────────────────────────────┘
 ```
@@ -78,8 +79,8 @@ Names must speak the language of the business domain, not the implementation.
 ## Task Progress
 
 - **Last task created:** 10 — Implementare CLI in main.rs
-- **Last task completed:** — *(aggiorna manualmente quando un task viene completato)*
-- **Next task to work on:** 01 — Aggiungere dipendenze Cargo.toml
+- **Last task completed:** 02 — PythonParser (infrastructure) — compila, implementa SourceCodeAnalyzer
+- **Next task to work on:** 03 — FileScanner (application) — struct e metodi `new`, `scan`, `scan_dir`, `try_analyze`
 
 ---
 
