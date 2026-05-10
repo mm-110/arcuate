@@ -78,9 +78,9 @@ Names must speak the language of the business domain, not the implementation.
 
 ## Task Progress
 
-- **Last task created:** 10 — Implementare CLI in main.rs
-- **Last task completed:** 02 — PythonParser (infrastructure) — compila, implementa SourceCodeAnalyzer
-- **Next task to work on:** 03 — FileScanner (application) — struct e metodi `new`, `scan`, `scan_dir`, `try_analyze`
+- **Last task created:** 10 — CLI in main.rs
+- **Last task completed:** 03 — FileScanner (application) — `new`, `scan`, `scan_dir`, `try_analyze`
+- **Next task to work on:** 06 — OutputWriter trait (domain/ports) — poi 04 MarkdownWriter, 05 IndexWriter, 07 Orchestrator, 08 CLI
 
 ---
 
