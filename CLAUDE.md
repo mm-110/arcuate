@@ -18,8 +18,10 @@ Stack: Rust 2024 · `rustpython-parser` (AST) · `walkdir` (filesystem) · `anyh
                  │ uses
 ┌────────────────▼────────────────────────────┐
 │  Infrastructure Layer  (Adapters)           │
-│    └── PythonParser  (rustpython-parser)    │
-│        implements SourceCodeAnalyzer        │
+│    ├── PythonParser  (rustpython-parser)    │
+│    │   implements SourceCodeAnalyzer        │
+│    └── MarkdownWriter                       │
+│        implements OutputWriter              │
 └────────────────┬────────────────────────────┘
                  │ produces
 ┌────────────────▼────────────────────────────┐
@@ -28,6 +30,7 @@ Stack: Rust 2024 · `rustpython-parser` (AST) · `walkdir` (filesystem) · `anyh
 │             ParsedSourceFile, ProjectLayout │
 │             SourceFileAnalysis              │
 │  ports/     SourceCodeAnalyzer, ParserError │
+│             OutputWriter, OutputWriterError │
 └─────────────────────────────────────────────┘
 ```
 
@@ -79,8 +82,9 @@ Names must speak the language of the business domain, not the implementation.
 ## Task Progress
 
 - **Last task created:** 10 — CLI in main.rs
-- **Last task completed:** 03 — FileScanner (application) — `new`, `scan`, `scan_dir`, `try_analyze`
-- **Next task to work on:** 06 — OutputWriter trait (domain/ports) — poi 04 MarkdownWriter, 05 IndexWriter, 07 Orchestrator, 08 CLI
+- **Last task completed:** 04 — MarkdownWriter (infrastructure) — `write`, `write_entries`, `render_markdown`, `render_construct`
+- **Tasks completed before:** 06 — OutputWriter + OutputWriterError (domain/ports); 03 — FileScanner (application)
+- **Next task to work on:** 05 — IndexWriter (infrastructure), poi 07 Orchestrator, 10 CLI
 
 ---
 
