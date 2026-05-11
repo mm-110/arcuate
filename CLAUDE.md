@@ -90,10 +90,35 @@ Names must speak the language of the business domain, not the implementation.
 
 ## Task Progress
 
-- **Last task created:** 10 — CLI in main.rs
 - **Last task completed:** 07+10 — Delivery layer: `delivery/factories.rs` (wiring) + CLI in `main.rs`
 - **Tasks completed before:** 05 — IndexWriter; 04 — MarkdownWriter; 06 — OutputWriter + OutputWriterError; 03 — FileScanner
-- **Next task to work on:** modalità "solo index" (CLI flag), nuovi language parser
+
+### Prossimi task pianificati
+
+**Task 11 — Dependency graph (analisi delle dipendenze)**
+Obiettivo: ordinare le cartelle nell'INDEX per ordine topologico (domain → infra → application → delivery).
+Architettura:
+- `domain/entities/dependency_graph.rs` — nuova entità `DependencyGraph`
+- `domain/entities/parsed_source_file.rs` + `source_file_analysis.rs` — aggiungere `imports: Vec<String>`
+- `domain/ports/index_writer.rs` — aggiornare firma: `write_index(..., graph: &DependencyGraph)`
+- `application/analyze_dependencies.rs` — nuovo use case: `ProjectLayout → DependencyGraph`
+- `infrastructure/markdown_writer.rs` — usa `DependencyGraph` per sort topologico in `render_index`
+- `delivery/factories.rs` + `delivery/run.rs` — wire il nuovo use case
+Funzionalità future sbloccate da questo task:
+  - Rilevamento cicli (violazioni architetturali)
+  - Validazione layer rules (domain non può importare da infra)
+  - Analisi impatto: dato un file modificato, trovare tutti i dipendenti
+  - Arricchimento INDEX con `depends on` / `imported by`
+Problemi di design da tenere a mente:
+  - La risoluzione degli import è contestuale: per mappare `from domain.X import Y` → dir `domain/`, il graph builder deve conoscere le dir top-level del ProjectLayout
+  - L'analisi è cross-file: `AnalyzeDependencies` riceve l'intero `ProjectLayout`, non un singolo file
+  - Il sort topologico appartiene al use case, non all'adapter
+
+**Task 12 — Modalità index-only (CLI flag `--index-only`)**
+Genera solo `INDEX.md` senza il mirror dei file. Richiede: nuovo flag in `main.rs`, nuovo use case o branch in `DocumentationGenerator`, factory aggiornata.
+
+**Task 13 — Nuovi language parser**
+Aggiungere supporto a un secondo linguaggio (es. Rust o TypeScript). Richiede solo un nuovo adapter in `infrastructure/` registrato in `make_file_scanner()`.
 
 ---
 

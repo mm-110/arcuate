@@ -30,14 +30,19 @@ fn constructs_from_stmts(stmts: &[ast::Stmt]) -> Vec<DocumentedConstruct> {
 
 fn construct_from_stmt(stmt: &ast::Stmt) -> Option<DocumentedConstruct> {
     match stmt {
-        ast::Stmt::FunctionDef(f) => Some(DocumentedConstruct {
-            name: f.name.to_string(),
-            kind: DefinitionKind::Function,
-            signature: Some(function_signature(&f.name, &f.args)),
-            docstring: module_doc(&f.body),
-            source_line_range: None,
-            nested_constructs: vec![],
-        }),
+        ast::Stmt::FunctionDef(f) => {
+            if f.name.as_str().starts_with('_') {
+                return None;
+            }
+            Some(DocumentedConstruct {
+                name: f.name.to_string(),
+                kind: DefinitionKind::Function,
+                signature: Some(function_signature(f)),
+                docstring: module_doc(&f.body),
+                source_line_range: None,
+                nested_constructs: vec![],
+            })
+        }
         ast::Stmt::ClassDef(c) => Some(DocumentedConstruct {
             name: c.name.to_string(),
             kind: DefinitionKind::Class,
@@ -61,9 +66,35 @@ fn module_doc(stmts: &[ast::Stmt]) -> Option<String> {
     }
 }
 
-fn function_signature(name: &ast::Identifier, args: &ast::Arguments) -> String {
-    let params: Vec<String> = args.args.iter().map(|a| a.def.arg.to_string()).collect();
-    format!("def {}({}):", name, params.join(", "))
+fn function_signature(f: &ast::StmtFunctionDef) -> String {
+    let params: Vec<String> = f.args.args.iter()
+        .filter(|a| a.def.arg.as_str() != "self")
+        .map(|a| {
+            let name = a.def.arg.to_string();
+            match &a.def.annotation {
+                Some(ann) => format!("{}: {}", name, expr_to_type_str(ann)),
+                None => name,
+            }
+        }).collect();
+    let return_annotation = f.returns.as_ref()
+        .map(|r| format!(" -> {}", expr_to_type_str(r)))
+        .unwrap_or_default();
+    format!("def {}({}){}:", f.name, params.join(", "), return_annotation)
+}
+
+fn expr_to_type_str(expr: &ast::Expr) -> String {
+    match expr {
+        ast::Expr::Name(n) => n.id.to_string(),
+        ast::Expr::Attribute(a) => format!("{}.{}", expr_to_type_str(&a.value), a.attr),
+        ast::Expr::Subscript(s) => format!("{}[{}]", expr_to_type_str(&s.value), expr_to_type_str(&s.slice)),
+        ast::Expr::BinOp(b) => format!("{} | {}", expr_to_type_str(&b.left), expr_to_type_str(&b.right)),
+        ast::Expr::Tuple(t) => t.elts.iter().map(|e| expr_to_type_str(e)).collect::<Vec<_>>().join(", "),
+        ast::Expr::Constant(c) => match &c.value {
+            ast::Constant::None => "None".to_string(),
+            _ => "_".to_string(),
+        },
+        _ => "_".to_string(),
+    }
 }
 
 fn class_signature(name: &ast::Identifier, bases: &[ast::Expr]) -> String {

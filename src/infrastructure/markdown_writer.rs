@@ -1,6 +1,5 @@
 //! Markdown writer that mirrors a project layout into .md files.
 use std::path::Path;
-use crate::domain::entities::definition_kind::DefinitionKind;
 use crate::domain::entities::documented_construct::DocumentedConstruct;
 use crate::domain::entities::parsed_source_file::ParsedSourceFile;
 use crate::domain::entities::project_layout::{ ProjectLayout, ProjectEntry };
@@ -16,33 +15,25 @@ impl MarkdownWriter {
             .and_then(|n| n.to_str())
             .unwrap_or("");
 
-        let mut out = format!("# {file_name}\n\n");
+        let title = match file.top_level_doc.as_deref().and_then(|d| d.lines().next()) {
+            Some(first_line) => format!("# {file_name} — {first_line}\n\n"),
+            None => format!("# {file_name}\n\n"),
+        };
 
-        if let Some(doc) = &file.top_level_doc {
-            out.push_str(doc);
-            out.push_str("\n\n");
-        }
-
+        let mut out = title;
         for construct in &file.documented_constructs {
             self.render_construct(&mut out, construct, 2);
         }
-
         out
     }
 
     fn render_construct(&self, out: &mut String, construct: &DocumentedConstruct, level: usize) {
         let heading = "#".repeat(level);
-        let kind_label = match construct.kind {
-            DefinitionKind::Class => "class",
-            DefinitionKind::Function => "fn",
-            DefinitionKind::Constant => "const",
-            DefinitionKind::Module => "module",
-        };
 
         if let Some(sig) = &construct.signature {
-            out.push_str(&format!("{heading} `{kind_label} {sig}`\n\n"));
+            out.push_str(&format!("{heading} `{sig}`\n\n"));
         } else {
-            out.push_str(&format!("{heading} `{kind_label} {}`\n\n", construct.name));
+            out.push_str(&format!("{heading} `{}`\n\n", construct.name));
         }
 
         if let Some(doc) = &construct.docstring {
@@ -53,7 +44,6 @@ impl MarkdownWriter {
             self.render_construct(out, nested, level + 1);
         }
     }
-
 
     fn write_entries(&self, entries: &[ProjectEntry], project_root_path: &Path, output_root: &Path) -> Result<(), OutputWriterError> {
         for entry in entries {
@@ -77,6 +67,69 @@ impl MarkdownWriter {
         }
         Ok(())
     }
+
+    fn render_index(&self, layout: &ProjectLayout) -> String {
+        let mut out = String::from("# Index\n\n");
+        self.render_index_entries(&mut out, &layout.entries, &layout.project_root_path, 0);
+        out
+    }
+
+    fn render_index_entries(&self, out: &mut String, entries: &[ProjectEntry], project_root: &Path, depth: usize) {
+        let indent = "  ".repeat(depth);
+
+        let mut dirs: Vec<&ProjectEntry> = entries.iter()
+            .filter(|e| matches!(e, ProjectEntry::Dir { .. }))
+            .collect();
+        dirs.sort_by_key(|e| match e {
+            ProjectEntry::Dir { path, .. } => path.file_name().unwrap_or_default().to_string_lossy().into_owned(),
+            _ => String::new(),
+        });
+
+        let mut files: Vec<&ProjectEntry> = entries.iter()
+            .filter(|e| match e {
+                ProjectEntry::File { path, .. } => path.file_name().map(|n| n != "__init__.py").unwrap_or(true),
+                _ => false,
+            })
+            .collect();
+        files.sort_by_key(|e| match e {
+            ProjectEntry::File { path, .. } => path.file_name().unwrap_or_default().to_string_lossy().into_owned(),
+            _ => String::new(),
+        });
+
+        for entry in dirs {
+            if let ProjectEntry::Dir { path, child_nodes } = entry {
+                let relative = path.strip_prefix(project_root).unwrap();
+                let dir_doc = init_doc(child_nodes)
+                    .map(|d| format!(" — {d}"))
+                    .unwrap_or_default();
+                out.push_str(&format!("{indent}- **{}/**{dir_doc}\n", relative.to_string_lossy()));
+                self.render_index_entries(out, child_nodes, project_root, depth + 1);
+            }
+        }
+
+        for entry in files {
+            if let ProjectEntry::File { path, parsed_source_file } = entry {
+                let relative = path.strip_prefix(project_root).unwrap();
+                let md_path = relative.with_extension("md").to_string_lossy().into_owned();
+                let file_name = relative.file_name().unwrap_or_default().to_string_lossy().into_owned();
+                let file_doc = parsed_source_file.top_level_doc.as_deref()
+                    .and_then(|d| d.lines().next())
+                    .map(|d| format!(" — {d}"))
+                    .unwrap_or_default();
+                out.push_str(&format!("{indent}- [{file_name}]({md_path}){file_doc} · [source]({})\n", path.display()));
+            }
+        }
+    }
+}
+
+/// Extracts the first line of the docstring from an `__init__.py` within the given entries.
+fn init_doc(entries: &[ProjectEntry]) -> Option<&str> {
+    entries.iter().find_map(|e| match e {
+        ProjectEntry::File { path, parsed_source_file }
+            if path.file_name().map(|n| n == "__init__.py").unwrap_or(false) =>
+            parsed_source_file.top_level_doc.as_deref()?.lines().next(),
+        _ => None,
+    })
 }
 
 impl OutputWriter for MarkdownWriter {
@@ -91,32 +144,5 @@ impl IndexWriter for MarkdownWriter {
         std::fs::create_dir_all(output_root)?;
         std::fs::write(output_root.join("INDEX.md"), content)?;
         Ok(())
-    }
-}
-
-impl MarkdownWriter {
-    fn render_index(&self, layout: &ProjectLayout) -> String {
-        let mut out = String::from("# Index\n\n");
-        self.render_index_entries(&mut out, &layout.entries, &layout.project_root_path, 0);
-        out
-    }
-
-    fn render_index_entries(&self, out: &mut String, entries: &[ProjectEntry], project_root: &Path, depth: usize) {
-        let indent = "  ".repeat(depth);
-        for entry in entries {
-            match entry {
-                ProjectEntry::File { path, .. } => {
-                    let relative = path.strip_prefix(project_root).unwrap();
-                    let md_path = relative.with_extension("md").to_string_lossy().into_owned();
-                    let source_path = relative.to_string_lossy().into_owned();
-                    out.push_str(&format!("{indent}- [{source_path}]({md_path}) · [source]({})\n", path.display()));
-                }
-                ProjectEntry::Dir { path, child_nodes } => {
-                    let relative = path.strip_prefix(project_root).unwrap();
-                    out.push_str(&format!("{indent}- **{}/**\n", relative.to_string_lossy()));
-                    self.render_index_entries(out, child_nodes, project_root, depth + 1);
-                }
-            }
-        }
     }
 }
