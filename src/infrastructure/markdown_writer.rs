@@ -4,6 +4,7 @@ use crate::domain::entities::definition_kind::DefinitionKind;
 use crate::domain::entities::documented_construct::DocumentedConstruct;
 use crate::domain::entities::parsed_source_file::ParsedSourceFile;
 use crate::domain::entities::project_layout::{ ProjectLayout, ProjectEntry };
+use crate::domain::ports::index_writer::IndexWriter;
 use crate::domain::ports::output_writer::OutputWriter;
 use crate::domain::ports::output_writer_error::OutputWriterError;
 
@@ -81,5 +82,41 @@ impl MarkdownWriter {
 impl OutputWriter for MarkdownWriter {
     fn write(&self, layout: &ProjectLayout, output_root: &Path) -> Result<(), OutputWriterError> {
         self.write_entries(&layout.entries, &layout.project_root_path, output_root)
+    }
+}
+
+impl IndexWriter for MarkdownWriter {
+    fn write_index(&self, layout: &ProjectLayout, output_root: &Path) -> Result<(), OutputWriterError> {
+        let content = self.render_index(layout);
+        std::fs::create_dir_all(output_root)?;
+        std::fs::write(output_root.join("INDEX.md"), content)?;
+        Ok(())
+    }
+}
+
+impl MarkdownWriter {
+    fn render_index(&self, layout: &ProjectLayout) -> String {
+        let mut out = String::from("# Index\n\n");
+        self.render_index_entries(&mut out, &layout.entries, &layout.project_root_path, 0);
+        out
+    }
+
+    fn render_index_entries(&self, out: &mut String, entries: &[ProjectEntry], project_root: &Path, depth: usize) {
+        let indent = "  ".repeat(depth);
+        for entry in entries {
+            match entry {
+                ProjectEntry::File { path, .. } => {
+                    let relative = path.strip_prefix(project_root).unwrap();
+                    let md_path = relative.with_extension("md").to_string_lossy().into_owned();
+                    let source_path = relative.to_string_lossy().into_owned();
+                    out.push_str(&format!("{indent}- [{source_path}]({md_path}) · [source]({})\n", path.display()));
+                }
+                ProjectEntry::Dir { path, child_nodes } => {
+                    let relative = path.strip_prefix(project_root).unwrap();
+                    out.push_str(&format!("{indent}- **{}/**\n", relative.to_string_lossy()));
+                    self.render_index_entries(out, child_nodes, project_root, depth + 1);
+                }
+            }
+        }
     }
 }

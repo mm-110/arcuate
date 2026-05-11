@@ -11,7 +11,14 @@ Stack: Rust 2024 · `rustpython-parser` (AST) · `walkdir` (filesystem) · `anyh
 
 ```
 ┌─────────────────────────────────────────────┐
-│  Application Layer  (Orchestrator)          │
+│  Delivery Layer                             │
+│  main.rs — CLI args, exit codes             │
+│  delivery/factories.rs — wires adapters     │
+│    into use cases                           │
+└────────────────┬────────────────────────────┘
+                 │ uses
+┌────────────────▼────────────────────────────┐
+│  Application Layer  (Use Cases)             │
 │  FileScanner — walks filesystem, dispatches │
 │  analyzers, builds ProjectLayout            │
 └────────────────┬────────────────────────────┘
@@ -21,7 +28,8 @@ Stack: Rust 2024 · `rustpython-parser` (AST) · `walkdir` (filesystem) · `anyh
 │    ├── PythonParser  (rustpython-parser)    │
 │    │   implements SourceCodeAnalyzer        │
 │    └── MarkdownWriter                       │
-│        implements OutputWriter              │
+│        implements OutputWriter,             │
+│                  IndexWriter                │
 └────────────────┬────────────────────────────┘
                  │ produces
 ┌────────────────▼────────────────────────────┐
@@ -31,6 +39,7 @@ Stack: Rust 2024 · `rustpython-parser` (AST) · `walkdir` (filesystem) · `anyh
 │             SourceFileAnalysis              │
 │  ports/     SourceCodeAnalyzer, ParserError │
 │             OutputWriter, OutputWriterError │
+│             IndexWriter                     │
 └─────────────────────────────────────────────┘
 ```
 
@@ -82,9 +91,9 @@ Names must speak the language of the business domain, not the implementation.
 ## Task Progress
 
 - **Last task created:** 10 — CLI in main.rs
-- **Last task completed:** 04 — MarkdownWriter (infrastructure) — `write`, `write_entries`, `render_markdown`, `render_construct`
-- **Tasks completed before:** 06 — OutputWriter + OutputWriterError (domain/ports); 03 — FileScanner (application)
-- **Next task to work on:** 05 — IndexWriter (infrastructure), poi 07 Orchestrator, 10 CLI
+- **Last task completed:** 07+10 — Delivery layer: `delivery/factories.rs` (wiring) + CLI in `main.rs`
+- **Tasks completed before:** 05 — IndexWriter; 04 — MarkdownWriter; 06 — OutputWriter + OutputWriterError; 03 — FileScanner
+- **Next task to work on:** modalità "solo index" (CLI flag), nuovi language parser
 
 ---
 
