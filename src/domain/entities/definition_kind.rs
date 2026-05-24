@@ -1,6 +1,7 @@
 //! Classifies the kind of construct a semantic entity represents.
 
 /// The category of a documented construct within a source file.
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DefinitionKind {
     /// The file itself; may carry a module-level docstring.

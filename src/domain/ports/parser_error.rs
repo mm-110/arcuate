@@ -3,6 +3,7 @@
 use std::fmt;
 
 /// Errors that a `SourceCodeAnalyzer` can return when analysing a source file.
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum ParserError {
     SyntaxError { message: String, line: Option<usize> },

@@ -3,6 +3,7 @@
 use super::definition_kind::DefinitionKind;
 
 /// A single documented construct extracted from a source file.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct DocumentedConstruct {
     pub name: String,
