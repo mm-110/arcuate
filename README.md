@@ -51,13 +51,14 @@ The result is a representation an agent can read whole. When it needs to act on 
 └────────────────┬────────────────────────────┘
                  │ produces
 ┌────────────────▼────────────────────────────┐
-│  Core Domain   (Entities + Ports)           │
+│  Core Domain   (Entities + Ports + Policies)│
 │  entities/  DocumentedConstruct,            │
 │             ParsedSourceFile, ProjectLayout │
 │             SourceFileAnalysis              │
 │  ports/     SourceCodeAnalyzer, ParserError │
 │             OutputWriter, OutputWriterError │
 │             IndexWriter                     │
+│  policies/  ExclusionRules                  │
 └─────────────────────────────────────────────┘
 ```
 
@@ -191,28 +192,42 @@ rq8 --input-dir ~/projects/myapp --exclude-dirs target,node_modules --exclude-fi
 ```
 arcuate/
 ├── src/
-│   ├── main.rs                         # CLI entry point
+│   ├── main.rs                              # arcuate binary entry point
+│   ├── rq8.rs                               # rq8 binary entry point (alias)
+│   ├── application.rs
+│   ├── application/
+│   │   ├── file_scanner.rs                  # Walks filesystem, builds ProjectLayout
+│   │   └── documentation_generator.rs       # Orchestrates analysis and writing
 │   ├── delivery.rs
 │   ├── delivery/
-│   │   ├── run.rs                      # Top-level orchestration
-│   │   ├── factories.rs                # Wires adapters into use cases
-│   │   └── mappers.rs
-│   ├── application/
-│   │   └── file_scanner.rs             # Walks filesystem, builds ProjectLayout
+│   │   ├── run.rs                           # Top-level orchestration
+│   │   ├── factories.rs                     # Wires adapters into use cases
+│   │   ├── mappers.rs
+│   │   └── mappers/
+│   │       └── cli_mapper.rs                # Maps CLI args to domain objects
 │   ├── domain.rs
 │   ├── domain/
+│   │   ├── entities.rs
 │   │   ├── entities/
+│   │   │   ├── definition_kind.rs
 │   │   │   ├── documented_construct.rs
 │   │   │   ├── parsed_source_file.rs
 │   │   │   ├── project_layout.rs
 │   │   │   └── source_file_analysis.rs
+│   │   ├── policies.rs
+│   │   ├── policies/
+│   │   │   └── exclusion_rules.rs           # File and directory exclusion logic
+│   │   ├── ports.rs
 │   │   └── ports/
-│   │       ├── source_code_analyzer.rs
+│   │       ├── index_writer.rs
 │   │       ├── output_writer.rs
-│   │       └── index_writer.rs
+│   │       ├── output_writer_error.rs
+│   │       ├── parser_error.rs
+│   │       └── source_code_analyzer.rs
+│   ├── infrastructure.rs
 │   └── infrastructure/
-│       ├── python_parser.rs            # AST parser — implements SourceCodeAnalyzer
-│       └── markdown_writer.rs          # implements OutputWriter + IndexWriter
+│       ├── markdown_writer.rs               # implements OutputWriter + IndexWriter
+│       └── python_parser.rs                 # AST parser — implements SourceCodeAnalyzer
 └── Cargo.toml
 ```
 
