@@ -3,6 +3,14 @@ name = "arcuate"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "arcuate"
+path = "src/main.rs"
+
+[[bin]]
+name = "rq8"
+path = "src/rq8.rs"
+
 [dependencies]
 anyhow = "1.0.102"
 rustpython-parser = "0.4.0"

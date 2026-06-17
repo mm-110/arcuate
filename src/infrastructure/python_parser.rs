@@ -37,7 +37,20 @@ fn construct_from_stmt(stmt: &ast::Stmt) -> Option<DocumentedConstruct> {
             Some(DocumentedConstruct {
                 name: f.name.to_string(),
                 kind: DefinitionKind::Function,
-                signature: Some(function_signature(f)),
+                signature: Some(build_signature(&f.name, &f.args, f.returns.as_deref(), false)),
+                docstring: module_doc(&f.body),
+                source_line_range: None,
+                nested_constructs: vec![],
+            })
+        }
+        ast::Stmt::AsyncFunctionDef(f) => {
+            if f.name.as_str().starts_with('_') {
+                return None;
+            }
+            Some(DocumentedConstruct {
+                name: f.name.to_string(),
+                kind: DefinitionKind::Function,
+                signature: Some(build_signature(&f.name, &f.args, f.returns.as_deref(), true)),
                 docstring: module_doc(&f.body),
                 source_line_range: None,
                 nested_constructs: vec![],
@@ -66,20 +79,26 @@ fn module_doc(stmts: &[ast::Stmt]) -> Option<String> {
     }
 }
 
-fn function_signature(f: &ast::StmtFunctionDef) -> String {
-    let params: Vec<String> = f.args.args.iter()
+fn build_signature(
+    name: &ast::Identifier,
+    args: &ast::Arguments,
+    returns: Option<&ast::Expr>,
+    is_async: bool,
+) -> String {
+    let params: Vec<String> = args.args.iter()
         .filter(|a| a.def.arg.as_str() != "self")
         .map(|a| {
-            let name = a.def.arg.to_string();
+            let param_name = a.def.arg.to_string();
             match &a.def.annotation {
-                Some(ann) => format!("{}: {}", name, expr_to_type_str(ann)),
-                None => name,
+                Some(ann) => format!("{}: {}", param_name, expr_to_type_str(ann)),
+                None => param_name,
             }
         }).collect();
-    let return_annotation = f.returns.as_ref()
+    let return_annotation = returns
         .map(|r| format!(" -> {}", expr_to_type_str(r)))
         .unwrap_or_default();
-    format!("def {}({}){}:", f.name, params.join(", "), return_annotation)
+    let prefix = if is_async { "async def" } else { "def" };
+    format!("{prefix} {name}({}){}:", params.join(", "), return_annotation)
 }
 
 fn expr_to_type_str(expr: &ast::Expr) -> String {

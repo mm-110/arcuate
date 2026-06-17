@@ -12,7 +12,7 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("Usage: arcuate [--input-dir <path>] [--output-dir <path>] [exclusion flags]");
+        println!("Usage: rq8 [--input-dir <path>] [--output-dir <path>] [exclusion flags]");
         println!();
         println!("Options:");
         println!("  --input-dir              Root of the project to scan (default: current directory)");
@@ -26,7 +26,7 @@ fn main() {
 
     if let Err(e) = validate_args(&args) {
         eprintln!("Error: {e}");
-        eprintln!("Run 'arcuate --help' for usage.");
+        eprintln!("Run 'rq8 --help' for usage.");
         process::exit(1);
     }
 

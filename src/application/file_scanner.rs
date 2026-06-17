@@ -4,6 +4,7 @@ use std::path::Path;
 use crate::domain::entities::parsed_source_file::ParsedSourceFile;
 use crate::domain::entities::project_layout::{ProjectEntry, ProjectLayout};
 use crate::domain::entities::source_file_analysis::SourceFileAnalysis;
+use crate::domain::policies::exclusion_rules::ExclusionRules;
 use crate::domain::ports::source_code_analyzer::SourceCodeAnalyzer;
 
 pub struct FileScanner {
@@ -15,14 +16,14 @@ impl FileScanner {
         Self { analyzers }
     }
 
-    pub fn scan(&self, root: &Path) -> ProjectLayout {
+    pub fn scan(&self, root: &Path, exclusion_rules: &ExclusionRules) -> ProjectLayout {
         ProjectLayout {
             project_root_path: root.to_path_buf(),
-            entries: self.scan_dir(root),
+            entries: self.scan_dir(root, exclusion_rules),
         }
     }
 
-    fn scan_dir(&self, dir: &Path) -> Vec<ProjectEntry> {
+    fn scan_dir(&self, dir: &Path, exclusion_rules: &ExclusionRules) -> Vec<ProjectEntry> {
         let mut entries: Vec<ProjectEntry> = Vec::new();
 
         let read_dir_iter = match std::fs::read_dir(dir) {
@@ -39,11 +40,14 @@ impl FileScanner {
             let path: std::path::PathBuf = entry.path();
 
             if path.is_dir() {
+                if exclusion_rules.excludes_dir(&path) {
+                    continue;
+                }
                 entries.push(ProjectEntry::Dir {
                     path: path.clone(),
-                    child_nodes: self.scan_dir(&path),
+                    child_nodes: self.scan_dir(&path, exclusion_rules),
                 });
-            } else if let Some(parsed) = self.try_analyze(&path) {
+            } else if let Some(parsed) = self.try_analyze(&path, exclusion_rules) {
                 entries.push(ProjectEntry::File {
                     path,
                     parsed_source_file: parsed,
@@ -54,7 +58,10 @@ impl FileScanner {
         entries
     }
 
-    fn try_analyze(&self, path: &Path) -> Option<ParsedSourceFile> {
+    fn try_analyze(&self, path: &Path, exclusion_rules: &ExclusionRules) -> Option<ParsedSourceFile> {
+        if exclusion_rules.excludes_file(path) {
+            return None;
+        }
         let ext: &str = path.extension()?.to_str()?;
         let analyzer: &Box<dyn SourceCodeAnalyzer> = self.analyzers
             .iter()
