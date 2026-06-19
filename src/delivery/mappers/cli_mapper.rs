@@ -4,6 +4,20 @@ use crate::domain::policies::exclusion_rules::ExclusionRules;
 
 /// Builds an `ExclusionRules` from the raw CLI argument list.
 pub fn exclusion_rules_from_args(args: &[String]) -> ExclusionRules {
+    let exclude_hidden = args.iter().any(|a| a == "--exclude-hidden");
+
+    let mut dir_starts_with_patterns = parse_list(args, "--exclude-dir-pattern");
+    let mut file_starts_with_patterns = parse_list(args, "--exclude-file-pattern");
+
+    if exclude_hidden {
+        if !dir_starts_with_patterns.contains(&".".to_string()) {
+            dir_starts_with_patterns.push(".".to_string());
+        }
+        if !file_starts_with_patterns.contains(&".".to_string()) {
+            file_starts_with_patterns.push(".".to_string());
+        }
+    }
+    
     ExclusionRules {
         dirs: parse_list(args, "--exclude-dirs"),
         files: parse_list(args, "--exclude-files"),
@@ -19,6 +33,7 @@ const KNOWN_FLAGS: &[&str] = &[
     "--exclude-files",
     "--exclude-dir-pattern",
     "--exclude-file-pattern",
+    "--exclude-hidden",
     "--help",
     "-h",
 ];

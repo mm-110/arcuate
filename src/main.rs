@@ -16,11 +16,12 @@ fn main() {
         println!();
         println!("Options:");
         println!("  --input-dir              Root of the project to scan (default: current directory)");
-        println!("  --output-dir             Where to write the generated Markdown (default: <input-dir>/<input-dir-name>_rq8_docs)");
+        println!("  --output-dir             Where to write the extracted Markdown (default: <input-dir>/<input-dir-name>_rq8_docs)");
         println!("  --exclude-dirs           Comma-separated directory names to exclude (e.g. target,node_modules)");
         println!("  --exclude-files          Comma-separated file names to exclude (e.g. __init__.py)");
         println!("  --exclude-dir-pattern    Comma-separated prefixes: exclude dirs whose name starts with these (e.g. .,test)");
         println!("  --exclude-file-pattern   Comma-separated prefixes: exclude files whose name starts with these (e.g. .,test_)");
+        println!("  --exclude-hidden         Exclude all files and directories starting with .");
         process::exit(0);
     }
 
@@ -45,10 +46,16 @@ fn main() {
 
     let exclusion_rules = exclusion_rules_from_args(&args);
 
-    if let Err(e) = run(&input_dir, &output_dir, exclusion_rules) {
-        eprintln!("Error: {e}");
-        process::exit(1);
+    match run(&input_dir, &output_dir, exclusion_rules) {
+        Err(e) => {
+            eprintln!("Error: {e}");
+            process::exit(1);
+        }
+        Ok(report) => {
+            println!("Output: {}", report.output_path.display());
+            println!("Files:  {}", report.files_written);
+            println!("Chars:  {}", report.total_chars);
+            println!("Tokens: ~{}", report.total_chars / 4);
+        }
     }
-
-    println!("Done. Output written to {}", output_dir.display());
 }

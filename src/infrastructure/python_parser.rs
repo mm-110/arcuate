@@ -28,6 +28,44 @@ fn constructs_from_stmts(stmts: &[ast::Stmt]) -> Vec<DocumentedConstruct> {
     stmts.iter().filter_map(construct_from_stmt).collect()
 }
 
+fn methods_from_class_body(stmts: &[ast::Stmt]) -> Vec<DocumentedConstruct> {
+    stmts.iter().filter_map(method_from_stmt).collect()
+}
+
+fn method_from_stmt(stmt: &ast::Stmt) -> Option<DocumentedConstruct> {
+    match stmt {
+        ast::Stmt::FunctionDef(f) => {
+            let name = f.name.as_str();
+            if name.starts_with('_') && name != "__init__" {
+                return None;
+            }
+            Some(DocumentedConstruct {
+                name: f.name.to_string(),
+                kind: DefinitionKind::Function,
+                signature: Some(build_signature(&f.name, &f.args, f.returns.as_deref(), false)),
+                docstring: module_doc(&f.body),
+                source_line_range: None,
+                nested_constructs: vec![],
+            })
+        }
+        ast::Stmt::AsyncFunctionDef(f) => {
+            let name = f.name.as_str();
+            if name.starts_with('_') && name != "__init__" {
+                return None;
+            }
+            Some(DocumentedConstruct {
+                name: f.name.to_string(),
+                kind: DefinitionKind::Function,
+                signature: Some(build_signature(&f.name, &f.args, f.returns.as_deref(), true)),
+                docstring: module_doc(&f.body),
+                source_line_range: None,
+                nested_constructs: vec![],
+            })
+        }
+        _ => None,
+    }
+}
+
 fn construct_from_stmt(stmt: &ast::Stmt) -> Option<DocumentedConstruct> {
     match stmt {
         ast::Stmt::FunctionDef(f) => {
@@ -62,7 +100,7 @@ fn construct_from_stmt(stmt: &ast::Stmt) -> Option<DocumentedConstruct> {
             signature: Some(class_signature(&c.name, &c.bases)),
             docstring: module_doc(&c.body),
             source_line_range: None,
-            nested_constructs: constructs_from_stmts(&c.body),
+            nested_constructs: methods_from_class_body(&c.body),
         }),
         _ => None,
     }

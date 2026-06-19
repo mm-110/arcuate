@@ -1,6 +1,7 @@
 //! Markdown writer that mirrors a project layout into .md files.
 use std::path::Path;
 use crate::domain::entities::documented_construct::DocumentedConstruct;
+use crate::domain::entities::extraction_report::ExtractionReport;
 use crate::domain::entities::parsed_source_file::ParsedSourceFile;
 use crate::domain::entities::project_layout::{ ProjectLayout, ProjectEntry };
 use crate::domain::ports::index_writer::IndexWriter;
@@ -15,7 +16,7 @@ impl MarkdownWriter {
             .and_then(|n| n.to_str())
             .unwrap_or("");
 
-        let title = match file.top_level_doc.as_deref().and_then(|d| d.lines().next()) {
+        let title = match file.top_level_doc.as_deref().and_then(|d| d.lines().find(|l| !l.trim().is_empty())) {
             Some(first_line) => format!("# {file_name} — {first_line}\n\n"),
             None => format!("# {file_name}\n\n"),
         };
@@ -45,7 +46,10 @@ impl MarkdownWriter {
         }
     }
 
-    fn write_entries(&self, entries: &[ProjectEntry], project_root_path: &Path, output_root: &Path) -> Result<(), OutputWriterError> {
+    fn write_entries(&self, entries: &[ProjectEntry], project_root_path: &Path, output_root: &Path) -> Result<(usize, usize), OutputWriterError> {
+        let mut files_written = 0;
+        let mut total_chars = 0;
+
         for entry in entries {
             match entry {
                 ProjectEntry::File { path, parsed_source_file } => {
@@ -55,17 +59,22 @@ impl MarkdownWriter {
                         std::fs::create_dir_all(parent)?;
                     }
                     let content = self.render_markdown(parsed_source_file);
+                    total_chars += content.len();
                     std::fs::write(&output_path, content)?;
+                    files_written += 1;
                 }
                 ProjectEntry::Dir { path, child_nodes } => {
                     let relative_path = path.strip_prefix(project_root_path).unwrap();
                     let output_path = output_root.join(relative_path);
                     std::fs::create_dir_all(&output_path)?;
-                    self.write_entries(child_nodes, project_root_path, output_root)?;
+                    let (sub_files, sub_chars) = self.write_entries(child_nodes, project_root_path, output_root)?;
+                    files_written += sub_files;
+                    total_chars += sub_chars;
                 }
             }
         }
-        Ok(())
+
+        Ok((files_written, total_chars))
     }
 
     fn render_index(&self, layout: &ProjectLayout) -> String {
@@ -113,7 +122,8 @@ impl MarkdownWriter {
                 let md_path = relative.with_extension("md").to_string_lossy().into_owned();
                 let file_name = relative.file_name().unwrap_or_default().to_string_lossy().into_owned();
                 let file_doc = parsed_source_file.top_level_doc.as_deref()
-                    .and_then(|d| d.lines().next())
+                    .map(|d| d.lines().filter(|l| !l.trim().is_empty()).collect::<Vec<_>>().join(" "))
+                    .filter(|s| !s.is_empty())
                     .map(|d| format!(" — {d}"))
                     .unwrap_or_default();
                 out.push_str(&format!("{indent}- [{file_name}]({md_path}){file_doc} · [source]({})\n", path.display()));
@@ -122,27 +132,42 @@ impl MarkdownWriter {
     }
 }
 
-/// Extracts the first line of the docstring from an `__init__.py` within the given entries.
-fn init_doc(entries: &[ProjectEntry]) -> Option<&str> {
+/// Extracts all non-empty lines of the docstring from an `__init__.py` within the given entries.
+fn init_doc(entries: &[ProjectEntry]) -> Option<String> {
     entries.iter().find_map(|e| match e {
         ProjectEntry::File { path, parsed_source_file }
             if path.file_name().map(|n| n == "__init__.py").unwrap_or(false) =>
-            parsed_source_file.top_level_doc.as_deref()?.lines().next(),
+        {
+            let lines: Vec<&str> = parsed_source_file.top_level_doc.as_deref()?
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .collect();
+            if lines.is_empty() { None } else { Some(lines.join(" ")) }
+        }
         _ => None,
     })
 }
 
 impl OutputWriter for MarkdownWriter {
-    fn write(&self, layout: &ProjectLayout, output_root: &Path) -> Result<(), OutputWriterError> {
-        self.write_entries(&layout.entries, &layout.project_root_path, output_root)
+    fn write(&self, layout: &ProjectLayout, output_root: &Path) -> Result<ExtractionReport, OutputWriterError> {
+        let (files_written, total_chars) = self.write_entries(&layout.entries, &layout.project_root_path, output_root)?;
+        Ok(ExtractionReport {
+            output_path: output_root.to_path_buf(),
+            files_written,
+            total_chars,
+        })
     }
 }
 
 impl IndexWriter for MarkdownWriter {
-    fn write_index(&self, layout: &ProjectLayout, output_root: &Path) -> Result<(), OutputWriterError> {
+    fn write_index(&self, layout: &ProjectLayout, output_root: &Path) -> Result<ExtractionReport, OutputWriterError> {
         let content = self.render_index(layout);
         std::fs::create_dir_all(output_root)?;
-        std::fs::write(output_root.join("INDEX.md"), content)?;
-        Ok(())
+        std::fs::write(output_root.join("INDEX.md"), &content)?;
+        Ok(ExtractionReport {
+            output_path: output_root.to_path_buf(),
+            files_written: 1,
+            total_chars: content.len(),
+        })
     }
 }
